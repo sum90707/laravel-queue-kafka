@@ -145,15 +145,17 @@ class KafkaQueue extends Queue implements QueueContract
         try {
             $queue = $this->getQueueName($queue);
             if (!array_key_exists($queue, $this->queues)) {
-                $this->queues[$queue] = $this->consumer->newQueue();
+
                 $topicConf = new \RdKafka\TopicConf();
                 $topicConf->set('auto.offset.reset', 'largest');
 
                 $this->topics[$queue] = $this->consumer->newTopic($queue, $topicConf);
+                $this->queues[$queue] = $this->consumer->newQueue();
+
                 $this->topics[$queue]->consumeQueueStart(0, RD_KAFKA_OFFSET_STORED, $this->queues[$queue]);
             }
 
-            $message = $this->queues[$queue]->consume(1000);
+            $message = $this->queues[$queue]->consume(1500);
 
             if ($message === null) {
                 return null;

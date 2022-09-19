@@ -5,7 +5,6 @@ namespace Rapide\LaravelQueueKafka\Queue\Jobs;
 use Exception;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
-use Illuminate\Database\DetectsDeadlocks;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Str;
@@ -16,7 +15,6 @@ use RdKafka\Message;
 
 class KafkaJob extends Job implements JobContract
 {
-    use DetectsDeadlocks;
 
     /**
      * @var KafkaQueue
@@ -70,8 +68,7 @@ class KafkaJob extends Job implements JobContract
             with($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
         } catch (Exception $exception) {
             if (
-                $this->causedByDeadlock($exception) ||
-                Str::contains($exception->getMessage(), ['detected deadlock'])
+               Str::contains($exception->getMessage(), ['detected deadlock'])
             ) {
                 sleep($this->connection->getConfig()['sleep_on_deadlock']);
                 $this->fire();
@@ -184,8 +181,7 @@ class KafkaJob extends Job implements JobContract
             return unserialize($body['data']['command']);
         } catch (Exception $exception) {
             if (
-                $this->causedByDeadlock($exception)
-                || Str::contains($exception->getMessage(), ['detected deadlock'])
+                Str::contains($exception->getMessage(), ['detected deadlock'])
             ) {
                 sleep($this->connection->getConfig()['sleep_on_deadlock']);
 

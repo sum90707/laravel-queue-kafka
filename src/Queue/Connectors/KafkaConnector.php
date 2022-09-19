@@ -36,30 +36,41 @@ class KafkaConnector implements ConnectorInterface
      */
     public function connect(array $config)
     {
-        /** @var Producer $producer */
-        $producer = $this->container->makeWith('queue.kafka.producer', []);
-        $producer->addBrokers($config['brokers']);
+        $producerConf = $this->setConf([
+            'bootstrap.servers' => $config['brokers'],
+            'metadata.broker.list' => $config['brokers'],
+        ]);
 
-        /** @var TopicConf $topicConf */
-        $topicConf = $this->container->makeWith('queue.kafka.topic_conf', []);
+        $producer = app(Producer::class, ['conf' => $producerConf]);
+
+
+        $topicConf = new TopicConf();
         $topicConf->set('auto.offset.reset', 'largest');
 
-        /** @var Conf $conf */
-        $conf = $this->container->makeWith('queue.kafka.conf', []);
-        if (true === $config['sasl_enable']) {
-            $conf->set('sasl.mechanisms', 'PLAIN');
-            $conf->set('sasl.username', $config['sasl_plain_username']);
-            $conf->set('sasl.password', $config['sasl_plain_password']);
-            $conf->set('ssl.ca.location', $config['ssl_ca_location']);
-        }
-        $conf->set('group.id', array_get($config, 'consumer_group_id', 'php-pubsub'));
-        $conf->set('metadata.broker.list', $config['brokers']);
-        $conf->set('enable.auto.commit', 'false');
-        $conf->set('offset.store.method', 'broker');
-        $conf->setDefaultTopicConf($topicConf);
 
-        /** @var KafkaConsumer $consumer */
-        $consumer = $this->container->makeWith('queue.kafka.consumer', ['conf' => $conf]);
+
+        $conf = [
+            'group.id'=> $config['consumer_group_id'] ,
+            'metadata.broker.list'=> $config['brokers'],
+            'enable.auto.commit'=> 'false',
+        ];
+
+        if(true === $config['sasl_enable']) {
+            $conf = $conf + [
+                    'sasl.mechanisms'=> 'PLAIN',
+                    'sasl.username'=> $config['sasl_plain_username'],
+                    'sasl.password'=> $config['sasl_plain_password'],
+                    'ssl.ca.location'=> $config['ssl_ca_location'],
+                ];
+        }
+
+        $consumerConf = $this->setConf($conf);
+        $consumerConf->setDefaultTopicConf($topicConf);
+
+
+        $consumer = app(\RdKafka\Consumer::class, [
+            'conf' => $consumerConf,
+        ]);
 
         return new KafkaQueue(
             $producer,
@@ -67,4 +78,14 @@ class KafkaConnector implements ConnectorInterface
             $config
         );
     }
-}
+
+    private function setConf(array $options): Conf
+    {
+        $conf = new Conf();
+
+        foreach ($options as $key => $value) {
+            $conf->set($key, $value);
+        }
+
+        return $conf;
+    }
